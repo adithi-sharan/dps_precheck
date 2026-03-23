@@ -1,0 +1,26 @@
+[
+  {
+    "application_id": "DMV1001",
+    "full_name": "Adithi Sharan",
+    "dob": "2005-04-12",
+    "current_address": "14 North Pleasant St, Amherst, MA",
+    "document_on_file": true,
+    "license_status": "active"
+  },
+  {
+    "application_id": "DMV1002",
+    "full_name": "Jordan Patel",
+    "dob": "2004-11-03",
+    "current_address": "22 Main St, Boston, MA",
+    "document_on_file": false,
+    "license_status": "active"
+  },
+  {
+    "application_id": "DMV1003",
+    "full_name": "Maya Lee",
+    "dob": "2003-08-19",
+    "current_address": "5 River Rd, Cambridge, MA",
+    "document_on_file": true,
+    "license_status": "flagged"
+  }
+]
