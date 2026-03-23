@@ -19,18 +19,47 @@ if page == "Applicant Intake":
     with st.form("precheck_form"):
         st.markdown("### Applicant Request Form")
 
+        st.markdown("#### Identity")
         full_name = st.text_input("Full Name")
         dob = st.text_input("Date of Birth (YYYY-MM-DD)")
         application_id = st.text_input("Application / License ID")
-        current_address = st.text_input("Current Address")
-        new_address = st.text_input("New Address")
 
+        st.markdown("#### Service Request")
         request_type = st.selectbox(
             "Request Type",
             ["Address Change", "License Renewal", "Contact Info Update"]
         )
 
-        uploaded_proof = st.checkbox("I am uploading proof / supporting document")
+        # defaults so variables always exist
+        current_address = ""
+        new_address = ""
+        uploaded_proof = False
+        vision_attestation = False
+        renewal_eligible = False
+        current_email = ""
+        new_email = ""
+        current_phone = ""
+        new_phone = ""
+
+        st.markdown("#### Request Details")
+
+        if request_type == "Address Change":
+            current_address = st.text_input("Current Address")
+            new_address = st.text_input("New Address")
+            uploaded_proof = st.checkbox("I am uploading proof of residency")
+
+        elif request_type == "License Renewal":
+            current_address = st.text_input("Current Address")
+            vision_attestation = st.checkbox("I confirm vision/self-attestation is complete")
+            renewal_eligible = st.checkbox("I confirm I am eligible for renewal")
+            uploaded_proof = st.checkbox("I am uploading supporting documents")
+
+        elif request_type == "Contact Info Update":
+            current_email = st.text_input("Current Email")
+            new_email = st.text_input("New Email")
+            current_phone = st.text_input("Current Phone")
+            new_phone = st.text_input("New Phone")
+
         notes = st.text_area("Optional Notes")
 
         submitted = st.form_submit_button("Run PreCheck")
@@ -40,10 +69,16 @@ if page == "Applicant Intake":
             "full_name": full_name,
             "dob": dob,
             "application_id": application_id,
+            "request_type": request_type,
             "current_address": current_address,
             "new_address": new_address,
-            "request_type": request_type,
             "uploaded_proof": uploaded_proof,
+            "vision_attestation": vision_attestation,
+            "renewal_eligible": renewal_eligible,
+            "current_email": current_email,
+            "new_email": new_email,
+            "current_phone": current_phone,
+            "new_phone": new_phone,
             "notes": notes
         }
 
@@ -77,7 +112,6 @@ if page == "Applicant Intake":
         st.markdown("### Reasons")
         for reason in result["reasons"]:
             st.write(f"- {reason}")
-
 
 elif page == "Operator Dashboard":
     st.markdown("## Operator Queue")
