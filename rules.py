@@ -1,7 +1,5 @@
 # a file storing rules to be classified in one of the three different apporvals 
-
 import re
-
 
 VALID_REQUEST_TYPES = {
     "Address Change",
@@ -12,7 +10,6 @@ VALID_REQUEST_TYPES = {
 def normalize_text(value: str) -> str:
     return value.strip().lower() if value else ""
 
-
 def is_address_valid(address: str) -> bool:
     if not address or len(address.strip()) < 10:
         return False
@@ -21,18 +18,44 @@ def is_address_valid(address: str) -> bool:
 def validate_required_fields(submission: dict) -> list[str]:
     missing = []
 
-    required_fields = [
+    # info required for everyone
+    common_fields = [
         "full_name",
         "dob",
         "application_id",
-        "current_address",
-        "new_address",
         "request_type"
     ]
 
-    for field in required_fields:
+    for field in common_fields:
         if not submission.get(field):
             missing.append(field)
+
+    request_type = submission.get("request_type")
+
+    if request_type == "Address Change":
+        address_fields = ["current_address", "new_address"]
+        for field in address_fields:
+            if not submission.get(field):
+                missing.append(field)
+
+    elif request_type == "License Renewal":
+        renewal_fields = ["current_address"]
+        for field in renewal_fields:
+            if not submission.get(field):
+                missing.append(field)
+
+        if submission.get("vision_attestation") is not True:
+            missing.append("vision_attestation")
+
+        if submission.get("renewal_eligible") is not True:
+            missing.append("renewal_eligible")
+
+    elif request_type == "Contact Info Update":
+        has_new_email = bool(submission.get("new_email"))
+        has_new_phone = bool(submission.get("new_phone"))
+
+        if not has_new_email and not has_new_phone:
+            missing.append("new_email_or_new_phone")
 
     return missing
 
@@ -67,14 +90,6 @@ def evaluate_submission(submission: dict, record: dict | None) -> dict:
             "reasons": ["Request type is not eligible for precheck."]
         }
 
-    checks["new_address_valid"] = is_address_valid(submission["new_address"])
-    if not checks["new_address_valid"]:
-        return {
-            "status": "BLOCKED_MISSING_INFO",
-            "checks": checks,
-            "reasons": ["New address format appears invalid."]
-        }
-
     checks["record_found"] = record is not None
     if not checks["record_found"]:
         return {
@@ -89,21 +104,43 @@ def evaluate_submission(submission: dict, record: dict | None) -> dict:
     checks["dob_match"] = (
         normalize_text(submission["dob"]) == normalize_text(record["dob"])
     )
-    checks["current_address_match"] = (
-        normalize_text(submission["current_address"]) == normalize_text(record["current_address"])
-    )
-
-    proof_available = submission.get("uploaded_proof", False) or record.get("document_on_file", False)
-    checks["proof_available"] = proof_available
 
     checks["license_active"] = record.get("license_status") == "active"
 
-    if not proof_available:
-        return {
-            "status": "BLOCKED_MISSING_INFO",
-            "checks": checks,
-            "reasons": ["No supporting proof available and no document is on file."]
-        }
+    request_type = submission["request_type"]
+
+    if request_type == "Address Change":
+        checks["current_address_match"] = (
+            normalize_text(submission["current_address"]) == normalize_text(record["current_address"])
+        )
+        checks["new_address_valid"] = is_address_valid(submission["new_address"])
+
+        proof_available = submission.get("uploaded_proof", False) or record.get("document_on_file", False)
+        checks["proof_available"] = proof_available
+
+        if not checks["new_address_valid"]:
+            return {
+                "status": "BLOCKED_MISSING_INFO",
+                "checks": checks,
+                "reasons": ["New address format appears invalid."]
+            }
+
+        if not proof_available:
+            return {
+                "status": "BLOCKED_MISSING_INFO",
+                "checks": checks,
+                "reasons": ["No supporting proof available and no document is on file."]
+            }
+
+    elif request_type == "License Renewal":
+        checks["current_address_match"] = (
+            normalize_text(submission["current_address"]) == normalize_text(record["current_address"])
+        )
+        checks["vision_attestation_complete"] = submission.get("vision_attestation", False)
+        checks["renewal_eligible_confirmed"] = submission.get("renewal_eligible", False)
+
+    elif request_type == "Contact Info Update":
+        checks["contact_update_provided"] = bool(submission.get("new_email")) or bool(submission.get("new_phone"))
 
     review_reasons = []
 
@@ -111,10 +148,12 @@ def evaluate_submission(submission: dict, record: dict | None) -> dict:
         review_reasons.append("Submitted name does not exactly match DMV record.")
     if not checks["dob_match"]:
         review_reasons.append("Date of birth does not match DMV record.")
-    if not checks["current_address_match"]:
-        review_reasons.append("Current address does not match record.")
     if not checks["license_active"]:
         review_reasons.append("License status requires human review.")
+
+    if request_type in {"Address Change", "License Renewal"}:
+        if not checks.get("current_address_match", True):
+            review_reasons.append("Current address does not match record.")
 
     if review_reasons:
         return {
@@ -128,3 +167,13 @@ def evaluate_submission(submission: dict, record: dict | None) -> dict:
         "checks": checks,
         "reasons": ["All verification checks passed."]
     }
+
+
+def get_priority(result: dict) -> str:
+    status = result["status"]
+
+    if status == "READY_FOR_APPROVAL":
+        return "High"
+    if status == "NEEDS_HUMAN_REVIEW":
+        return "Medium"
+    return "Low"
